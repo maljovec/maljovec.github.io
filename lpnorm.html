@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Dan Maljovec's Homepage</title>
+    <meta charset="utf-8"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="keywords" content="Dan Maljovec Daniel Patrick Computer Science CS Graphics Gannon University Utah Erie GE Insight Technology ImmersiMap Sandia Lawrence Livermore Idaho National Laboratory" />
+    <meta name="description" content="Dan Maljovec graduated from Gannon May 9, 2009 and is now a Graduate Student at the University of Utah in the School of Computing's Graphics and Visualization Track." />
+    <!-- Styles -->
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.css">
+    <link rel="stylesheet" type="text/css" href="menu.css" />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+    <!-- Scripts -->
+    <script src="http://d3js.org/d3.v4.min.js"></script>
+    <script src="menu.js"></script>
+    <style>
+      #pNorm
+      {
+        margin: auto;
+        max-width: 200px;
+        width: 90%;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="site-wrapper">
+      <div id="site-canvas">
+        <h1 id="site-title">Dan Maljovec</h1>
+        <div id="site-menu">
+          <ul>
+            <li><img alt='maljovec' class='avatar' src="https://avatars3.githubusercontent.com/u/8671026?v=3&s=460"></li>
+            <li><a href="#"><i class="toggle-nav fa fa-chevron-right fa-fw" id="toggleMenu"></i></a></li>
+            <li><a href="index.html">Home <i class="fa fa-home fa-fw"></i></a></li>
+            <li><a href="cv.html">CV <i class="fa fa-file-text fa-fw"></i></a></li>
+            <li><a href="pubs.html">Papers <i class="fa fa-files-o fa-fw"></i></a></li>
+            <li><a href="academia.html">Academia <i class="fa fa-graduation-cap fa-fw"></i></a></li>
+<!--            <li><a href="projects.html">Projects <i class="fa fa-cogs fa-fw"></i></a></li> -->
+            <li><a href="experiment.html">Experimental <i class="fa fa-flask fa-fw"></i></a></li>
+          </ul>
+        </div>
+        <div id="site-body" style="min-height: 100vh;">
+          <h2 class="content">L<sup>p</sup>-Norm</h2>
+          <p class="body" id='pNorm'>p:<input style='width:90%' type="range" id='pNormSlider' min="0.2" max="5" value="2" step="0.1" oninput="updateDistance(this.value)" /><span id="p"></span></p>
+          <script>
+          var plotSize = 200;
+          var padding = 10;
+          var animationTime = 500;
+
+          var svg = d3.select("#site-body").append("svg")
+              .attr("width", plotSize)
+              .attr("height", plotSize)
+              .style("display", "block")
+              .style("margin", "auto");
+
+          function pointPositions(p)
+          {
+            var points = "";
+            var sep = "";
+            var numSegments = 360;
+            var radius = plotSize/2.-padding;
+            var radiusP = Math.pow(radius,p);
+            for (var i = 0; i < numSegments; i++)
+            {
+              var x = radius*(i/numSegments*2.0-1.0);
+              var xP = Math.pow(Math.abs(x),p);
+
+              var yPos = Math.pow(radiusP-xP,1./p);
+              var yNeg = -yPos;
+
+              points = x.toString() + ',' + yPos.toString() + ',' + points + sep + x.toString() + ',' + yNeg.toString();
+              sep = ',';
+            }
+            return points;
+          }
+
+          var polygon = svg.append("polygon")
+                             .attr('class','polygon')
+                             .attr("points", pointPositions(2))
+                             .attr("stroke-width", 4)
+                             .attr('fill', '#c33')
+                             .attr('fill-opacity', '0.25')
+                             .attr("stroke", "#c33")
+                             .attr("transform", "translate("+(plotSize/2).toString()+","+(plotSize/2).toString()+")");
+
+          function updateDistance(newValue)
+          {
+            document.getElementById("p").innerHTML=newValue;
+            pNorm=newValue;
+            d3.select(".polygon").transition()
+              .duration(animationTime)
+              .attr("points", pointPositions(pNorm))
+              .attr("transform", "translate("+(plotSize/2).toString()+","+(plotSize/2).toString()+")");
+          }
+          updateDistance(2);
+          </script>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

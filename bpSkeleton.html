@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Dan Maljovec's Homepage</title>
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="keywords" content="Dan Maljovec Daniel Patrick Computer Science CS Graphics Gannon University Utah Salt Lake City Erie GE Insight Technology ImmersiMap Sandia Lawrence Livermore Idaho National Laboratory SNL INL LLNL Topology Geometry Dimensionality Computing" />
+        <meta name="description" content="Dan Maljovec graduated from Gannon May 9, 2009 and is now a Graduate Student at the University of Utah in the School of Computing's Graphics and Visualization Track." />
+        <!-- Styles -->
+        <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.css">
+        <link rel="stylesheet" type="text/css" href="css/common.css" />
+        <link rel="stylesheet" type="text/css" href="css/menu.css" />
+        <link rel="stylesheet" type="text/css" href="css/slider.css" />
+        <style>
+            :root
+            {
+                /* For highlighted items */
+                --highlight-color: #c33;
+                --highlight-opacity: 0.75;
+
+                /* For foreground items that are not highlighted */
+                --active-color: #000;
+                --active-opacity: 0.5;
+
+                /* For background items or disabled pieces */
+                --inactive-color: #fff;
+                --inactive-opacity: 0.25;
+
+                --templateSize: 100;
+                --graphSize: 200;
+            }
+
+            #templateShape
+            {
+                display: "block";
+                margin: "auto";
+                width: var(--templateSize);
+                height: var(--templateSize);
+            }
+
+            #templateShape .polygon
+            {
+                stroke-width: 2px;
+                stroke: var(--highlight-color);
+                fill: var(--highlight-color);
+                fill-opacity: var(--highlight-opacity);
+            }
+
+            .graph
+            {
+                stroke-width: 2px;
+                stroke: var(--highlight-color);
+                fill: none;
+            }
+
+            .axis
+            {
+                stroke: var(--active-color);
+                stroke-opacity: 1;
+                /* stroke-dasharray: 10,5; */
+                stroke-width: 3;
+            }
+
+            .grid
+            {
+                stroke: var(--inactive-color);
+                stroke-opacity: var(--inactive-opacity);
+                shape-rendering: crispEdges;
+            }
+
+            .circle
+            {
+                fill: var(--inactive-color);
+                fill-opacity: 0;
+                stroke: var(--active-color);
+                stroke-opacity: var(--inactive-opacity);
+            }
+
+            .point
+            {
+                fill: var(--active-color);
+                stroke-width: 0px;
+            }
+
+            .query
+            {
+                fill: var(--active-color);
+                stroke-width: 0px;
+            }
+
+            .guidePoint
+            {
+                fill: var(--active-color);
+                fill-opacity: var(--inactive-opacity);
+                stroke-width: 0px;
+            }
+
+            .edge
+            {
+                fill: var(--active-color);
+                stroke: var(--active-color);
+                stroke-width: 4px;
+                stroke-opacity: 1;
+            }
+
+            .face
+            {
+                stroke-width: 0px;
+                fill: var(--inactive-color);
+                fill-opacity: var(--inactive-opacity);
+            }
+
+            p
+            {
+                width: 50%;
+                display: block;
+                margin: auto;
+                text-align: center;
+            }
+
+            .hidden
+            {
+                display: none;
+                visibility: hidden;
+            }
+
+        </style>
+        <!-- External Scripts -->
+        <script src="http://d3js.org/d3.v4.min.js"></script>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+        <script src="js/greiner-hormann.min.js"></script>
+        <!-- Internal Scripts -->
+        <script src="menu.js"></script>
+        <script src="js/utils.js" charset="utf-8"></script>
+        <script src="js/plots.js" charset="utf-8"></script>
+        <!-- Common variables and functions used by all of the example plots -->
+        <script type="text/javascript">
+            //Debugging features
+            var templateEnabled = true;
+            var plotEnabled = true;
+            var knnEnabled = false;
+            var ergEnabled = true;
+            var debug = true;
+            var maxP = 5;
+
+            // User-specified values
+            var pNorm;
+            var beta;
+            var k;
+
+            //To be computed from the CSS after the html has been instantiated
+            var style;                            // For retrieving CSS values
+
+            var templateSize;                     // Example Lp-Norm shape size
+
+            var padding = 10;                     // Shape above's padding
+                                                  // (using a fixed value since
+                                                  //  stroke-width has more of
+                                                  //  an effect on this)
+
+            var graphSize;                        // Size of the displayed
+                                                  // neighborhoods
+
+            var numSamples = 12;                  // This is based on a hard-
+                                                  // coded contrived set of
+                                                  // points
+
+            var points = new Array(2*numSamples); // Data as flattened xy-array
+
+            function updateDistance(newValue){
+                if (newValue == maxP)
+                {
+                    pNorm = Number.POSITIVE_INFINITY;
+                    document.getElementById("p").innerHTML='\u221e';
+                }
+                else
+                {
+                    pNorm = parseFloat(newValue);
+                    document.getElementById("p").innerHTML=newValue;
+                }
+
+                updateTemplate(pNorm, templateSize);
+                updatePlot(beta, pNorm, graphSize);
+                constructKNN(d3.select('#knnCanvas'), points, k, pNorm);
+                constructERG(d3.select('#ergCanvas'), points, beta, pNorm);
+            }
+
+            function initializeData(width, height) {
+                ////////////////////////////////////////////////////////////////
+                //Fixed points ensure a good test case
+                points[0] = 0.32 * width; points[1] = 0.57 * height;
+                points[2] = 0.55 * width; points[3] = 0.82 * height;
+                points[4] = 0.58 * width; points[5] = 0.55 * height;
+                points[6] = 0.63 * width; points[7] = 0.72 * height;
+                points[8] = 0.82 * width; points[9] = 0.60 * height;
+                points[10] = 0.73 * width; points[11] = 0.40 * height;
+                points[12] = 0.53 * width; points[13] = 0.22 * height;
+                points[14] = 0.60 * width; points[15] = 0.18 * height;
+                points[16] = 0.37 * width; points[17] = 0.17 * height;
+                points[18] = 0.23 * width; points[19] = 0.83 * height;
+                points[20] = 0.17 * width; points[21] = 0.50 * height;
+                points[22] = 0.30 * width; points[23] = 0.33 * height;
+
+                ////////////////////////////////////////////////////////////////
+                // Debug
+                if (debug)
+                {
+                    numSamples = 2;
+                    points = points.slice(0,2*numSamples);
+                    // points[0] = 0.25*width;
+                    // points[2] = 0.75*width;
+                    // points[3] = points[1] = 0.5*height;
+                }
+                // End Debug
+                ////////////////////////////////////////////////////////////////
+            }
+
+            function updateTemplate(pNorm, templateSize){
+                if (!templateEnabled) { return; }
+
+                var template = pNormShape(pNorm, templateSize/2, templateSize/2,
+                                        templateSize/2. - padding);
+                d3.select(".polygon").attr("points", pointsToString(template));
+            }
+
+            function updatePlot(beta, pNorm, graphSize) {
+                if (!plotEnabled)
+                {
+                    return;
+                }
+                ////////////////////////////////////////////////////////////////
+                //// DEBUG
+                var theta;
+                var t;
+                var p,q,r;
+                var rTransformed;
+                var d_pq;
+                var maxHeight;
+                var realizedHeight;
+
+                p = {x: points[0], y: points[1]}
+                q = {x: points[2], y: points[3]}
+                r = {x: 0.3 * graphSize, y: 0.7 * graphSize}
+
+                //// Compute the maximum distance allowed where this point
+                //// projects to the line
+                d_pq = lpNorm(p.x, p.y, q.x, q.y, 2);
+                t = dot([q.x-p.x, q.y-p.y], [r.x-p.x, r.y-p.y]) / Math.pow(d_pq,2);
+                maxHeight = maxDistance(t, beta, pNorm);
+
+                //// Compute the actual distance where this point lies in the
+                //// transformed space
+                theta = Math.atan2(q.y-p.y,q.x-p.x);
+                rTransformed = {x: r.x, y: r.y};
+                rTransformed = translate(rTransformed, -p.x, -p.y);
+                rTransformed = rotate(rTransformed, -theta);
+                realizedHeight = Math.abs(rTransformed.y) / d_pq;
+
+                d3.selectAll('.query').remove();
+                d3.select('#ergCanvas')
+                    .append("circle")
+                        .attr("class", "query")
+                        .attr("r", 5)
+                        .attr("cx", r.x)
+                        .attr("cy", r.y)
+                        .attr("id",'queryERG');
+
+                rTransformed.x = rTransformed.x / d_pq;
+                rTransformed.y = rTransformed.y / d_pq;
+
+                d3.select('#templatePlot')
+                    .append("circle")
+                        .attr("class", "query")
+                        .attr("r", 5)
+                        .attr("cx", graphSize*rTransformed.x)
+                        .attr("cy", graphSize - graphSize*rTransformed.y)
+                        .attr("id",'parameterizedQuery');
+
+                d3.select('#templatePlot')
+                    .append("line")
+                        .attr("class", "query")
+                        .style("stroke", "#000")
+                        .style("stroke-width", 2)
+                        .style("stroke-dasharray", [10,5])
+                        .attr("x1", graphSize*t)
+                        .attr("y1", graphSize)
+                        .attr("x2", graphSize*t)
+                        .attr("y2", graphSize - graphSize*maxHeight)
+                        .attr("id",'maxParameterHeight');
+
+                d3.select('#templatePlot')
+                    .append("line")
+                        .attr("class", "query")
+                        .style("stroke", "#000")
+                        .style("stroke-width", 2)
+                        .style("stroke-dasharray", [10,5])
+                        .attr("x1", 0)
+                        .attr("y1", graphSize - graphSize*realizedHeight)
+                        .attr("x2", graphSize)
+                        .attr("y2", graphSize - graphSize*realizedHeight)
+                        .attr("id",'parameterHeight');
+                //// END DEBUG
+                ////////////////////////////////////////////////////////////////
+
+                if (realizedHeight < maxHeight)
+                {
+                    d3.select(".graph").style('fill', '#c33')
+                                        .style('fill-opacity', 0.5);
+                }
+                else
+                {
+                    d3.select(".graph").style('fill', 'none')
+                                        .style('fill-opacity', 0.0);
+                }
+
+                var template = maxDistanceShape(beta, pNorm, graphSize, graphSize);
+                d3.select(".graph")
+                    .datum(template)
+                    .attr("d", area);
+            }
+
+            function updateKNN(newValue) {
+                if (!knnEnabled) { return; }
+
+                document.getElementById("k").innerHTML=newValue;
+                k=parseInt(newValue);
+                constructKNN(d3.select('#knnCanvas'), points, k, pNorm);
+            }
+
+            function updateERG(newValue) {
+                if (!ergEnabled) { return; }
+
+                document.getElementById("beta").innerHTML=newValue;
+                beta=parseFloat(newValue);
+
+                updatePlot(beta, pNorm, graphSize);
+                constructERG(d3.select('#ergCanvas'), points, beta, pNorm);
+            }
+        </script>
+    </head>
+
+    <body>
+        <div id="site-wrapper">
+            <div id="site-canvas">
+                <h1 id="site-title">Dan Maljovec</h1>
+                <div id="site-menu">
+                <ul>
+                    <li><img alt='maljovec' class='avatar' src="https://avatars3.githubusercontent.com/u/8671026?v=3&s=460"></li>
+                    <li><a href="#"><i class="toggle-nav fa fa-chevron-right fa-fw" id="toggleMenu"></i></a></li>
+                    <li><a href="index.html">Home <i class="fa fa-home fa-fw"></i></a></li>
+                    <li><a href="cv.html">CV <i class="fa fa-file-text fa-fw"></i></a></li>
+                    <li><a href="pubs.html">Papers <i class="fa fa-files-o fa-fw"></i></a></li>
+                    <li><a href="academia.html">Academia <i class="fa fa-graduation-cap fa-fw"></i></a></li>
+        <!--            <li><a href="projects.html">Projects <i class="fa fa-cogs fa-fw"></i></a></li> -->
+                    <li><a href="experiment.html">Experimental <i class="fa fa-flask fa-fw"></i></a></li>
+                </ul>
+                </div>
+                <div id="site-body"style="min-height: 100vh;">
+                    <!-- Lp-norm manipulation and visualization -->
+                    <h2 class="content">L<sup>p</sup>-Norm</h2>
+                    <svg id="templateShape">
+                        <polygon class="polygon"></polygon>
+                    </svg>
+                    <p class="body" id='pNorm'>
+                        <span class="text">p:</span>
+                        <span class="text" id="p"></span>
+                    </p>
+                    <input type="range" id='pNormSlider' min="0.2" max="5" value="2" step="0.1" oninput="updateDistance(this.value)" />
+                    <svg id="templatePlot">
+                        <path class="graph"></path>
+                    </svg>
+
+                    <!-- K-nearest neighborhood graph manipulation and visualization -->
+                    <h2 id="knnHeader" class="content">KNN Graph</h2>
+                    <p id="knnText" class="body">
+                        <span class="text">k:</span>
+                        <span class="text" id="k"></span>
+                    </p>
+                    <input type="range" id='knnInput' min="1" max="1" value="1" step="1" oninput="updateKNN(this.value)" />
+                    <svg class="knn" id="knnCanvas"></svg>
+
+                    <!-- Beta skeleton graph manipulation and visualization -->
+                    <h2 id="ergHeader" class="content">&#946-Skeleton</h2>
+                    <p id="ergText" class="body">
+                        <span class="text">&#946:</span>
+                        <span class="text" id="beta"></span>
+                    </p>
+                    <input type="range" id='ergInput' min="0.01" max="2" value="1" step="0.01" oninput="updateERG(this.value)" />
+                    <svg class="erg" id="ergCanvas"></svg>
+
+                    <!-- Scripting that depends on elements above existing -->
+                    <script>
+                        style = window.getComputedStyle(document.body);
+                        templateSize = parseInt(style.getPropertyValue('--templateSize'));
+                        graphSize = parseInt(style.getPropertyValue('--graphSize'));
+
+                        initializeData(graphSize,graphSize);
+                        document.getElementById("knnInput").max = numSamples-1;
+
+                        d3.select('#templateShape').attr("width", templateSize)
+                                                .attr("height", templateSize)
+                                                .style("display", "block")
+                                                .style("margin", "auto");
+
+                        plot = d3.select('#templatePlot')
+                        constructGrid(plot, graphSize, graphSize, 4, 4);
+                        plot.append('line')
+                            .attr("class", "axis")
+                            .attr('x1', graphSize/2.)
+                            .attr('y1', 0)
+                            .attr('x2', graphSize/2.)
+                            .attr('y1', graphSize);
+                        plot.append('line')
+                            .attr("class", "axis")
+                            .attr('x1', 0)
+                            .attr('y1', graphSize)
+                            .attr('x2', graphSize)
+                            .attr('y2', graphSize);
+
+                        pNorm = parseFloat(document.getElementById("pNormSlider").value);
+                        document.getElementById("p").innerHTML=pNorm;
+
+                        k = parseInt(document.getElementById("knnInput").value);
+                        document.getElementById("k").innerHTML=k;
+
+                        beta = parseFloat(document.getElementById("ergInput").value);
+                        document.getElementById("beta").innerHTML=beta;
+
+                        if (!templateEnabled)
+                        {
+                            d3.selectAll('#templateShape')
+                                        .style("visibility", 'hidden')
+                                        .style("display", 'none');
+                        }
+
+                        if (!plotEnabled)
+                        {
+                            d3.selectAll('#templatePlot')
+                                        .style("visibility", 'hidden')
+                                        .style("display", 'none');
+                        }
+
+                        if (knnEnabled)
+                        {
+                            constructGrid(d3.select("#knnCanvas"), graphSize, graphSize);
+                        }
+                        else
+                        {
+                            d3.selectAll('#knnHeader, #knnText, #knnInput, #knnCanvas')
+                                        .style("visibility", 'hidden')
+                                        .style("display", 'none');
+                        }
+
+                        if (ergEnabled)
+                        {
+                            constructGrid(d3.select("#ergCanvas"), graphSize, graphSize);
+                        }
+                        else
+                        {
+                            d3.selectAll('#ergHeader, #ergCanvas')
+                                .style("visibility", 'hidden')
+                                .style("display", 'none');
+                        }
+
+                        updateDistance(pNorm);
+                    </script>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>

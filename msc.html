@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Dan Maljovec's Homepage</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="keywords" content="Dan Maljovec Daniel Patrick Computer Science CS Graphics Gannon University Utah Erie GE Insight Technology ImmersiMap" />
+	  <meta name="description" content="Dan Maljovec graduated from Gannon May 9, 2009 and is now a Graduate Student at the University of Utah in the School of Computing's Graphics and Visualization Track." />
+    <!-- Styles -->
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.css">
+    <link rel="stylesheet" type="text/css" href="css/common.css" />
+    <link rel="stylesheet" type="text/css" href="css/menu.css" />
+    <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+    <!-- Scripts -->
+    <script src="http://d3js.org/d3.v4.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <!--<script src="http://labratrevenge.com/d3-tip/javascripts/d3.tip.v0.6.3.js"></script>-->
+    <script src="js/menu.js"></script>
+    <!-- Common variables and functions used by all of the example plots -->
+    <script type="text/javascript">
+      function testFunction(x,y) {
+        return   (1./2.) * Math.exp(-(Math.pow(x-.25,2)/0.09))
+               + (1./4.) * Math.exp(-(Math.pow(y-.25,2)/0.09))
+               + (3./4.) * Math.exp(-(Math.pow(x-.75,2)/0.01))
+               + Math.exp(-(Math.pow(y-.75,2)/0.01));
+      }
+
+      function testFunction(x,y) {
+        return   (1./2.) * Math.exp(-(Math.pow(x-.25,2)+Math.pow(y-.25,2))/0.05)
+               - (2./4.) * Math.exp(-(Math.pow(x-.75,2)+Math.pow(y-.25,2))/0.05)
+               - (3./6.) * Math.exp(-(Math.pow(x-.25,2)+Math.pow(y-.75,2))/0.05)
+               + (4./8.) * Math.exp(-(Math.pow(x-.75,2)+Math.pow(y-.75,2))/0.05);
+      }
+
+      // function testFunction(x,y) {
+      //   return   -Math.exp(-(Math.pow(x-.5,2)+Math.pow(y-.5,2))/0.1);
+      // }
+
+      myColors = ['rgb(166,206,227)','rgb(178,223,138)','rgb(251,154,153)','rgb(253,191,111)','rgb(202,178,214)','rgb(255,255,153)','rgb(31,120,180)','rgb(51,160,44)','rgb(227,26,28)','rgb(255,127,0)','rgb(106,61,154)','rgb(177,89,40)'];
+
+      //background grid information
+      var width = 600;          //Width of each plot
+      var height = 600;         //Height of each plot
+      var cellSize = 20;
+      var gridWidth = Math.ceil(width / cellSize);
+      var gridHeight = Math.ceil(height / cellSize);
+      var grid = new Array(gridWidth * gridHeight);
+
+      var cMap = d3.scaleLinear()
+          .domain([0., 1.])
+          // .range(["hsl(62,100%,90%)", "hsl(222,30%,20%)"])
+          .range(["#67000d", "#fff5f0"])
+          .interpolate(d3.interpolateHcl);
+
+      //The function values for the grid cells
+      var foo = new Array(gridWidth * gridHeight);
+      for (y = 0; y < gridHeight; y++) {
+        for(x = 0; x < gridWidth; x++) {
+          foo[y*gridWidth + x] = testFunction(x/(gridWidth-1),y/(gridHeight-1));
+          // foo[y*gridWidth + x] = ((y*gridWidth + x) / grid.length);
+        }
+      }
+
+      function updateGridLocation(idx, newValue)
+      {
+        foo[idx]=newValue;
+      }
+
+      var maxFlow = {};
+      var minFlow = {};
+      var CPs = {};
+      var colorDict = {};
+      var nextColor = 0;
+
+      function getMin(idx){
+        while (idx in minFlow && idx != minFlow[idx]) {
+            idx = minFlow[idx];
+        }
+        return idx;
+      }
+      function getMax(idx){
+        while (idx in maxFlow && idx != maxFlow[idx]) {
+            idx = maxFlow[idx];
+        }
+        return idx;
+      }
+
+      //var tip = d3.tip()
+      //  .attr('class', 'd3-tip')
+      //  .offset([-10, 0])
+      //  .html(function(idx)
+      //  {
+      //    xIdx = parseInt(idx) % gridWidth;
+      //    yIdx = Math.floor(parseInt(idx) / gridWidth);
+      //    roundedValue = Math.round(foo[idx]*1e6) / 1e6;
+      //    return   "<span class='tooltip'>index: " + idx.toString()
+      //           + "<br />minimum: " + getMin(idx).toString()
+      //           + "<br />maximum: " + getMax(idx).toString()
+      //           + "<br />f(" + xIdx.toString() + "," + yIdx.toString()
+      //           + ") = " + roundedValue + "</span>";
+      //  });
+
+      function pointMouseOver(d) {
+        idx = parseInt(this.id.split('_')[1]);
+        minIdx = getMin(idx);
+        maxIdx = getMax(idx);
+        d3.select("#point_"+minIdx.toString())
+          .transition()
+            .attr("r", 10)
+            .attr('stroke-width',1)
+            .attr("stroke", '#fff')
+            .attr("fill", cMap(0));
+        d3.select("#point_"+maxIdx.toString())
+          .transition()
+            .attr("r", 10)
+            .attr('stroke-width',1)
+            .attr("stroke", '#fff')
+            .attr("fill", cMap(1));
+        //tip.show(idx);
+
+      }
+      function pointMouseOut(d) {
+        idx = parseInt(this.id.split('_')[1]);
+        minIdx = getMin(idx);
+        maxIdx = getMax(idx);
+        idx1 = getMin(minIdx).toString() + '_' + getMax(minIdx).toString();
+        idx2 = getMin(maxIdx).toString() + '_' + getMax(maxIdx).toString();
+        d3.select("#point_"+minIdx.toString())
+          .transition()
+            .attr("r", 5)
+            .attr('stroke-width',0)
+            // .attr("fill", colorDict[idx1.toString()])
+            .attr("fill",cMap(foo[minIdx]))
+            .attr("stroke",cMap(foo[minIdx]));
+        d3.select("#point_"+maxIdx.toString())
+          .transition()
+            .attr("r", 5)
+            .attr('stroke-width',0)
+            // .attr("fill", colorDict[idx2.toString()])
+            .attr("fill",cMap(foo[maxIdx]))
+            .attr("stroke",cMap(foo[maxIdx]));
+        //tip.hide(idx);
+      }
+
+      function constructGradientFlow(canvas) {
+        canvas.selectAll('.arrow').remove();
+        canvas.selectAll('.face').remove();
+        canvas.selectAll('.edge').remove();
+        canvas.selectAll('.point').remove();
+        var arrows = canvas.append("g").attr("class", "arrow");
+        var faces = canvas.append("g").attr("class", "face");
+        var edges = canvas.append("g").attr("class", "edge");
+        var points = canvas.append("g").attr("class", "point");
+
+        //canvas.call(tip);
+
+        function functionValueOrder(i,j) {
+          ///Orders two indices based on increasing function value, and will
+          // apply simulation of simplicity to break ties, where the larger
+          // index is "higher" valued.
+          if (foo[i] < foo[j] || (foo[i] == foo[j] && i < j)) {
+            return [i,j];
+          }
+          else {
+            return [j,i];
+          }
+        }
+
+        function getIdx(x,y) {
+          ///Converts a 2D index to a flattened array index
+          return y*gridWidth+x;
+        }
+
+        //First determine each point's steepest a/descending neighbor
+        for (y = 0; y < gridHeight; y++) {
+          for(x = 0; x < gridWidth; x++) {
+            //Set the point as its own maximum/minimum
+            minIdx = maxIdx = currentIdx = y*gridWidth + x;
+            maxFlow[currentIdx.toString()] = maxIdx.toString();
+            minFlow[currentIdx.toString()] = minIdx.toString();
+
+            //Test the point's right neighbor (or wrapped neighbor)
+            if ( x < gridWidth-1) {
+              testIdx = getIdx(x+1,y);
+            }
+            else {
+              testIdx = getIdx(0,y);
+            }
+            maxIdx = functionValueOrder(maxIdx,testIdx)[1];
+            minIdx = functionValueOrder(minIdx,testIdx)[0];
+            //Test the points upper neighbor (or wrapped neighbor)
+            if ( y < gridHeight-1) {
+              testIdx = getIdx(x,y+1);
+            }
+            else {
+              testIdx = getIdx(x,0);
+            }
+            maxIdx = functionValueOrder(maxIdx,testIdx)[1];
+            minIdx = functionValueOrder(minIdx,testIdx)[0];
+            //Test the points left neighbor (or wrapped neighbor)
+            if ( x > 0) {
+              testIdx = getIdx(x-1,y);
+            }
+            else {
+              testIdx = getIdx(gridWidth-1,y);
+            }
+            maxIdx = functionValueOrder(maxIdx,testIdx)[1];
+            minIdx = functionValueOrder(minIdx,testIdx)[0];
+            //Test the points lower neighbor (or wrapped neighbor)
+            if ( y > 0) {
+              testIdx = getIdx(x,y-1);
+            }
+            else {
+              testIdx = getIdx(x,gridHeight-1);
+            }
+            maxIdx = functionValueOrder(maxIdx,testIdx)[1];
+            minIdx = functionValueOrder(minIdx,testIdx)[0];
+
+            minFlow[currentIdx.toString()] = minIdx.toString();
+            maxFlow[currentIdx.toString()] = maxIdx.toString();
+
+          }
+        }
+
+        for (y = 0; y < gridHeight; y++) {
+          for(x = 0; x < gridWidth; x++) {
+            minIdx = maxIdx = currentIdx = y*gridWidth + x;
+            fxy = foo[getIdx(x,y)];
+            fx1y = foo[getIdx(x+1,y)];
+            fxy1 = foo[getIdx(x,y+1)];
+            fx1y1 = foo[getIdx(x+1,y+1)];
+
+            minIdx = getMin(currentIdx.toString());
+            maxIdx = getMax(currentIdx.toString());
+            idx = minIdx.toString() + '_' + maxIdx.toString();
+            if (!(idx in colorDict)) {
+                colorDict[idx] = myColors[nextColor];
+                nextColor = nextColor + 1;
+                if (nextColor > myColors.length) {
+                    nextColor = 0;
+                }
+            }
+
+            points.append("circle")
+               .attr("class", "point")
+                .attr("r", 1e-6)
+                .attr("cx", x*cellSize+cellSize/2.)
+                .attr("cy", y*cellSize+cellSize/2.)
+                .attr("id","point_"+(y*gridWidth + x).toString())
+                // .attr("stroke", colorDict[idx])
+                // .attr("fill", colorDict[idx])
+                .attr("stroke",cMap(fxy))
+                .attr("fill",cMap(fxy))
+                .on("mouseover", pointMouseOver)
+                .on("mouseout", pointMouseOut)
+                // .on("click",incrementFoo)
+                // .on("dblclick",decrementFoo)
+              .transition()
+                .attr("r", 5);
+            if (x < gridWidth-1) {
+              //Horizontal edge
+              edges.append("line")
+                .attr("class","edge")
+                .attr("x1",(x+0.5)*cellSize)
+                .attr("y1",(y+0.5)*cellSize)
+                .attr("x2",(x+1.5)*cellSize)
+                .attr("y2",(y+0.5)*cellSize)
+                .attr("id","edge_"+getIdx(x,y).toString()+"_"+getIdx(x+1,y).toString())
+                .attr("stroke",cMap(0.5*(fxy+fx1y)))
+                .on("mouseout", mapMouseOut)
+                .on("mouseover",mapMouseOver);
+
+              x2 = x1 = (x+1)*cellSize;
+              y1 = (y+0.4)*cellSize;
+              y2 = (y+0.6)*cellSize;
+              y3 = (y+0.5)*cellSize;
+              if (fxy < fx1y) {
+                x3 = x1 + 0.2*cellSize;
+                maxFlow[getIdx(x,y).toString()+"_"+getIdx(x+1,y).toString()] = getIdx(x+1,y).toString();
+                minFlow[getIdx(x,y).toString()+"_"+getIdx(x+1,y).toString()] = getIdx(x,y).toString();
+              }
+              else {
+                x3 = x1 - 0.2*cellSize;
+                maxFlow[getIdx(x,y).toString()+"_"+getIdx(x+1,y).toString()] = getIdx(x,y).toString();
+                minFlow[getIdx(x,y).toString()+"_"+getIdx(x+1,y).toString()] = getIdx(x+1,y).toString();
+              }
+              var pts =   x1.toString() + ',' + y1.toString() + ','
+                        + x2.toString() + ',' + y2.toString() + ','
+                        + x3.toString() + ',' + y3.toString();
+
+              arrows.append("polygon")
+                  .attr("points",pts)
+                  .attr("class","arrow")
+                  .attr("id","arrow_"+getIdx(x,y).toString()+"_"+getIdx(x+1,y).toString())
+                  .attr("fill",'#009')
+                  .on("mouseout", mapMouseOut)
+                  .on("mouseover",mapMouseOver);
+            }
+            else
+            {
+              //Wrap the edge boundary
+              //Horizontal edge
+              edges.append("line")
+                .attr("class","edge")
+                .attr("x1",(x+0.5)*cellSize)
+                .attr("y1",(y+0.5)*cellSize)
+                .attr("x2",(x+1)*cellSize)
+                .attr("y2",(y+0.5)*cellSize)
+                .attr("id","edge_"+getIdx(0,y).toString()+"_"+getIdx(x,y).toString()+'_b')
+                .attr("stroke",cMap(0.5*(fxy+foo[getIdx(0,y)])))
+                .on("mouseout", mapMouseOut)
+                .on("mouseover",mapMouseOver);
+              edges.append("line")
+                .attr("class","edge")
+                .attr("x1",0)
+                .attr("y1",(y+0.5)*cellSize)
+                .attr("x2",0.5*cellSize)
+                .attr("y2",(y+0.5)*cellSize)
+                .attr("id","edge_"+getIdx(0,y).toString()+"_"+getIdx(x,y).toString()+'_a')
+                .attr("stroke",cMap(0.5*(fxy+foo[getIdx(0,y)])))
+                .on("mouseout", mapMouseOut)
+                .on("mouseover",mapMouseOver);
+
+              y1 = (y+0.4)*cellSize;
+              y2 = (y+0.6)*cellSize;
+              y3 = (y+0.5)*cellSize;
+              if (fxy < foo[getIdx(0,y)]) {
+                x2 = x1 = 0;
+                x3 = x1 + 0.2*cellSize;
+                maxFlow[getIdx(0,y).toString()+"_"+getIdx(x,y).toString()] = getIdx(0,y).toString();
+                minFlow[getIdx(0,y).toString()+"_"+getIdx(x,y).toString()] = getIdx(x,y).toString();
+              }
+              else {
+                x2 = x1 = (x+1)*cellSize;
+                x3 = x1 - 0.2*cellSize;
+                maxFlow[getIdx(0,y).toString()+"_"+getIdx(x,y).toString()] = getIdx(x,y).toString();
+                minFlow[getIdx(0,y).toString()+"_"+getIdx(x,y).toString()] = getIdx(0,y).toString();
+              }
+              var pts =   x1.toString() + ',' + y1.toString() + ','
+                        + x2.toString() + ',' + y2.toString() + ','
+                        + x3.toString() + ',' + y3.toString();
+
+              arrows.append("polygon")
+                  .attr("points",pts)
+                  .attr("class","arrow")
+                  .attr("id","arrow_"+getIdx(0,y).toString()+"_"+getIdx(x,y).toString())
+                  .attr("fill",'#009')
+                  .on("mouseout", mapMouseOut)
+                  .on("mouseover",mapMouseOver);
+            }
+            if (y < gridHeight-1) {
+              //Vertical edge
+              f1 = foo[y*gridWidth + x];
+              edges.append("line")
+                .attr("class","edge")
+                .attr("x1",x*cellSize+cellSize/2.)
+                .attr("y1",y*cellSize+cellSize/2.)
+                .attr("x2",x*cellSize+cellSize/2.)
+                .attr("y2",(y+1)*cellSize+cellSize/2.)
+                .attr("id","edge_"+getIdx(x,y).toString()+"_"+getIdx(x,y+1).toString())
+                .attr("stroke",cMap(0.5*(fxy+fxy1)))
+                .on("mouseout", mapMouseOut)
+                .on("mouseover",mapMouseOver);
+
+              y2 = y1 = (y+1)*cellSize;
+              x1 = (x+0.4)*cellSize;
+              x2 = (x+0.6)*cellSize;
+              x3 = (x+0.5)*cellSize;
+              if (fxy < fxy1) {
+                y3 = y1 + 0.2*cellSize;
+                maxFlow[getIdx(x,y).toString()+"_"+getIdx(x,y+1).toString()] = getIdx(x,y+1).toString();
+                minFlow[getIdx(x,y).toString()+"_"+getIdx(x,y+1).toString()] = getIdx(x,y).toString();
+              }
+              else {
+                y3 = y1 - 0.2*cellSize;
+                maxFlow[getIdx(x,y).toString()+"_"+getIdx(x,y+1).toString()] = getIdx(x,y).toString();
+                minFlow[getIdx(x,y).toString()+"_"+getIdx(x,y+1).toString()] = getIdx(x,y+1).toString();
+              }
+              var pts =   x1.toString() + ',' + y1.toString() + ','
+                        + x2.toString() + ',' + y2.toString() + ','
+                        + x3.toString() + ',' + y3.toString();
+
+              arrows.append("polygon")
+                  .attr("points",pts)
+                  .attr("class","arrow")
+                  .attr("id","arrow_"+getIdx(x,y).toString()+"_"+getIdx(x,y+1).toString())
+                  .attr("fill",'#009')
+                  .on("mouseout", mapMouseOut)
+                  .on("mouseover",mapMouseOver);
+            }
+            else
+            {
+              //Wrap the edge boundary
+              //Vertical edge
+              f1 = foo[y*gridWidth + x];
+              edges.append("line")
+                .attr("class","edge")
+                .attr("x1",x*cellSize+cellSize/2.)
+                .attr("y1",y*cellSize+cellSize/2.)
+                .attr("x2",x*cellSize+cellSize/2.)
+                .attr("y2",(y+1)*cellSize)
+                .attr("id","edge_"+getIdx(x,0).toString()+"_"+getIdx(x,y).toString()+'_b')
+                .attr("stroke",cMap(0.5*(fxy+foo[getIdx(x,0)])))
+                .on("mouseout", mapMouseOut)
+                .on("mouseover",mapMouseOver);
+              edges.append("line")
+                .attr("class","edge")
+                .attr("x1",x*cellSize+cellSize/2.)
+                .attr("y1",0)
+                .attr("x2",x*cellSize+cellSize/2.)
+                .attr("y2",cellSize/2.)
+                .attr("id","edge_"+getIdx(x,0).toString()+"_"+getIdx(x,y).toString()+'_a')
+                .attr("stroke",cMap(0.5*(fxy+foo[x])))
+                .on("mouseout", mapMouseOut)
+                .on("mouseover",mapMouseOver);
+
+              x1 = (x+0.4)*cellSize;
+              x2 = (x+0.6)*cellSize;
+              x3 = (x+0.5)*cellSize;
+              if (fxy < foo[getIdx(x,0)]) {
+                y2 = y1 = 0;
+                y3 = y1 + 0.2*cellSize;
+                maxFlow[getIdx(x,0).toString()+"_"+getIdx(x,y).toString()] = getIdx(x,0).toString();
+                minFlow[getIdx(x,0).toString()+"_"+getIdx(x,y).toString()] = getIdx(x,y).toString();
+              }
+              else {
+                y2 = y1 = (y+1)*cellSize;
+                y3 = y1 - 0.2*cellSize;
+                maxFlow[getIdx(x,0).toString()+"_"+getIdx(x,y).toString()] = getIdx(x,y).toString();
+                minFlow[getIdx(x,0).toString()+"_"+getIdx(x,y).toString()] = getIdx(x,0).toString();
+              }
+              var pts =   x1.toString() + ',' + y1.toString() + ','
+                        + x2.toString() + ',' + y2.toString() + ','
+                        + x3.toString() + ',' + y3.toString();
+
+              arrows.append("polygon")
+                  .attr("points",pts)
+                  .attr("class","arrow")
+                  .attr("id","arrow_"+getIdx(x,0).toString()+"_"+getIdx(x,y).toString())
+                  .attr("fill",'#009')
+                  .on("mouseout", mapMouseOut)
+                  .on("mouseover",mapMouseOver);
+            }
+            if (x < (gridWidth-1) && y < (gridHeight-1)) {
+              var pts =   (    x*cellSize+cellSize/2.).toString() + ','
+                        + (    y*cellSize+cellSize/2.).toString() + ','
+                        + ((x+1)*cellSize+cellSize/2.).toString() + ','
+                        + (    y*cellSize+cellSize/2.).toString() + ','
+                        + ((x+1)*cellSize+cellSize/2.).toString() + ','
+                        + ((y+1)*cellSize+cellSize/2.).toString() + ','
+                        + (    x*cellSize+cellSize/2.).toString() + ','
+                        + ((y+1)*cellSize+cellSize/2.).toString();
+
+              var idx =   getIdx(x,y).toString() + "_"
+                        + getIdx(x+1,y).toString() + "_"
+                        + getIdx(x,y+1).toString() + "_"
+                        + getIdx(x+1,y+1).toString();
+
+              faces.append("polygon")
+                  .attr("points",pts)
+                  .attr("class","face")
+                  .attr("id","face_"+idx)
+                  .attr("fill",cMap(0.25*(fxy+fx1y+fxy1+fx1y1)))
+                  .on("mouseout", mapMouseOut)
+                  .on("mouseover",mapMouseOver);
+              e1 = 0.5*(fxy1+fx1y1);
+              e2 = 0.5*(fx1y1+fx1y);
+              e3 = 0.5*(fxy+fx1y);
+              e4 = 0.5*(fxy+fxy1);
+              maxValue = Math.max(e1,e2,e3,e4);
+              minValue = Math.min(e1,e2,e3,e4);
+              if (e1 == maxValue)
+              {
+                //down
+                y2 = y1 = (y+1)*cellSize;
+                x1 = (x+0.9)*cellSize;
+                x2 = (x+1.1)*cellSize;
+                x3 = (x+1)*cellSize;
+                y3 = y1 + 0.2*cellSize;
+
+                maxFlow[idx] = getIdx(x,y+1).toString()+'_'+getIdx(x+1,y+1).toString();
+              }
+              else if (e2 == maxValue)
+              {
+                //right
+                x2 = x1 = (x+1)*cellSize;
+                y1 = (y+0.9)*cellSize;
+                y2 = (y+1.1)*cellSize;
+                y3 = (y+1)*cellSize;
+                x3 = x1 + 0.2*cellSize;
+
+                maxFlow[idx] = getIdx(x+1,y).toString()+'_'+getIdx(x+1,y+1).toString();
+              }
+              else if (e3 == maxValue)
+              {
+                //up
+                y2 = y1 = (y+1)*cellSize;
+                x1 = (x+0.9)*cellSize;
+                x2 = (x+1.1)*cellSize;
+                x3 = (x+1)*cellSize;
+                y3 = y1 - 0.2*cellSize;
+
+                maxFlow[idx] = getIdx(x,y).toString()+'_'+getIdx(x+1,y).toString();
+              }
+              else
+              {
+                //left
+                x2 = x1 = (x+1)*cellSize;
+                y1 = (y+0.9)*cellSize;
+                y2 = (y+1.1)*cellSize;
+                y3 = (y+1)*cellSize;
+                x3 = x1 - 0.2*cellSize;
+
+                maxFlow[idx] = getIdx(x,y).toString()+'_'+getIdx(x,y+1).toString();
+              }
+              if (e1 == minValue)
+              {
+                //down
+                minFlow[idx] = getIdx(x,y+1).toString()+'_'+getIdx(x+1,y+1).toString();
+              }
+              else if (e2 == minValue)
+              {
+                //right
+                minFlow[idx] = getIdx(x+1,y).toString()+'_'+getIdx(x+1,y+1).toString();
+              }
+              else if (e3 == minValue)
+              {
+                //up
+                minFlow[idx] = getIdx(x,y).toString()+'_'+getIdx(x+1,y).toString();
+              }
+              else
+              {
+                //left
+                minFlow[idx] = getIdx(x,y).toString()+'_'+getIdx(x,y+1).toString();
+              }
+              var pts =   x1.toString() + ',' + y1.toString() + ','
+                        + x2.toString() + ',' + y2.toString() + ','
+                        + x3.toString() + ',' + y3.toString();
+
+              // arrows.append("polygon")
+              //     .attr("points",pts)
+              //     .attr("class","arrow")
+              //     .attr("id","arrow_"+idx)
+              //     .attr("fill",'#600')
+              //     .on("mouseout", mapMouseOut)
+              //     .on("mouseover",mapMouseOver);
+            }
+          }
+        }
+      }
+
+      function updateGradientFlow(canvas) {
+        var arrows = canvas.selectAll('.arrow');
+        var faces = canvas.selectAll('.face');
+        var edges = canvas.selectAll('.edge');
+        var points = canvas.selectAll('.point');
+
+        for (y = 0; y < gridHeight; y++) {
+          for(x = 0; x < gridWidth; x++) {
+            fxy = foo[y*gridWidth + x];
+            fx1y = foo[y*gridWidth + x+1];
+            fxy1 = foo[(y+1)*gridWidth + x];
+            fx1y1 = foo[(y+1)*gridWidth + x+1];
+            points.select("#point_"+(y*gridWidth + x).toString())
+                .attr("stroke",cMap(fxy))
+                .attr("fill",cMap(fxy));
+            if (x < gridWidth-1) {
+              //Horizontal edge
+              edges.select("#edge_"+(y*gridWidth + x).toString()+"_"+(y*gridWidth + x+1).toString())
+                .attr("stroke",cMap(0.5*(fxy+fx1y)));
+
+              x2 = x1 = (x+1)*cellSize;
+              y1 = (y+0.4)*cellSize;
+              y2 = (y+0.6)*cellSize;
+              y3 = (y+0.5)*cellSize;
+              if (fxy < fx1y) {
+                x3 = x1 + 0.2*cellSize;
+              }
+              else {
+                x3 = x1 - 0.2*cellSize;
+              }
+              var pts =   x1.toString() + ',' + y1.toString() + ','
+                        + x2.toString() + ',' + y2.toString() + ','
+                        + x3.toString() + ',' + y3.toString();
+
+              arrows.select("#arrow_"+(y*gridWidth + x).toString()+"_"+(y*gridWidth + x+1).toString())
+                  .attr("points",pts)
+                  .attr("fill",'#009');
+              }
+            if (y < gridHeight-1) {
+              //Vertical edge
+              f1 = foo[y*gridWidth + x];
+              edges.select("#edge_"+(y*gridWidth + x).toString()+"_"+((y+1)*gridWidth + x).toString())
+                .attr("stroke",cMap(0.5*(fxy+fxy1)));
+
+              y2 = y1 = (y+1)*cellSize;
+              x1 = (x+0.4)*cellSize;
+              x2 = (x+0.6)*cellSize;
+              x3 = (x+0.5)*cellSize;
+              if (fxy < fxy1) {
+                y3 = y1 + 0.2*cellSize;
+              }
+              else {
+                y3 = y1 - 0.2*cellSize;
+              }
+              var pts =   x1.toString() + ',' + y1.toString() + ','
+                        + x2.toString() + ',' + y2.toString() + ','
+                        + x3.toString() + ',' + y3.toString();
+
+              arrows.select("#arrow_"+(y*gridWidth + x).toString()+"_"+((y+1)*gridWidth + x).toString())
+                  .attr("points",pts)
+                  .attr("fill",'#009');
+            }
+            if (x < (gridWidth-1) && y < (gridHeight-1)) {
+              var idx =   (    y*gridWidth +   x).toString() + "_"
+                        + (    y*gridWidth + x+1).toString() + "_"
+                        + ((y+1)*gridWidth +   x).toString() + "_"
+                        + ((y+1)*gridWidth + x+1).toString();
+
+              faces.select("#face_"+idx)
+                  .attr("fill",cMap(0.25*(fxy+fx1y+fxy1+fx1y1)));
+              e1 = 0.5*(fxy1+fx1y1);
+              e2 = 0.5*(fx1y1+fx1y);
+              e3 = 0.5*(fxy+fx1y);
+              e4 = 0.5*(fxy+fxy1);
+              maxValue = Math.max(e1,e2,e3,e4);
+              if (e1 == maxValue)
+              {
+                //up
+                y2 = y1 = (y+1)*cellSize;
+                x1 = (x+0.9)*cellSize;
+                x2 = (x+1.1)*cellSize;
+                x3 = (x+1)*cellSize;
+                y3 = y1 + 0.2*cellSize;
+              }
+              else if (e2 == maxValue)
+              {
+                //right
+                x2 = x1 = (x+1)*cellSize;
+                y1 = (y+0.9)*cellSize;
+                y2 = (y+1.1)*cellSize;
+                y3 = (y+1)*cellSize;
+                x3 = x1 + 0.2*cellSize;
+              }
+              else if (e3 == maxValue)
+              {
+                //down
+                y2 = y1 = (y+1)*cellSize;
+                x1 = (x+0.9)*cellSize;
+                x2 = (x+1.1)*cellSize;
+                x3 = (x+1)*cellSize;
+                y3 = y1 - 0.2*cellSize;
+              }
+              else
+              {
+                //left
+                x2 = x1 = (x+1)*cellSize;
+                y1 = (y+0.9)*cellSize;
+                y2 = (y+1.1)*cellSize;
+                y3 = (y+1)*cellSize;
+                x3 = x1 - 0.2*cellSize;
+              }
+              var pts =   x1.toString() + ',' + y1.toString() + ','
+                        + x2.toString() + ',' + y2.toString() + ','
+                        + x3.toString() + ',' + y3.toString();
+
+              arrows.select("#arrow_"+idx)
+                  .attr("points",pts)
+                  .attr("fill",'#600');
+            }
+          }
+        }
+      }
+
+      function mapMouseOut(d)
+      {
+      }
+      function mapMouseOver(d)
+      {
+      }
+      function incrementFoo(d)
+      {
+        var idx = parseInt(this.id.toString().split('_')[1])
+        foo[idx] += 1. / grid.length;
+        updateGradientFlow((d3.select('body').select('#site-body').select('#canvas')));
+      }
+      function decrementFoo(d)
+      {
+        var idx = parseInt(this.id.toString().split('_')[1])
+        foo[idx] -= 1. / grid.length;
+        updateGradientFlow((d3.select('body').select('#site-body').select('#canvas')));
+      }
+    </script>
+    <style>
+      .grid
+      {
+        stroke: #000;
+        stroke-opacity: .15;
+        shape-rendering: crispEdges;
+        z-index: -1;
+      }
+
+      .point
+      {
+        stroke-width: 1px;
+        stroke-opacity: 1;
+        z-index: 3;
+      }
+
+      .edge
+      {
+        stroke-width: 4px;
+        stroke-opacity: 1;
+        z-index: 2;
+      }
+
+      .face
+      {
+        stroke-width: 0px;
+        fill-opacity: .5;
+        z-index: 1;
+      }
+
+      .arrow
+      {
+        stroke-width: 0px;
+        fill-opacity: .75;
+        shape-rendering: crispEdges;
+        z-index: 4;
+      }
+
+      .point:hover {
+        stroke-width: 1px;
+        stroke: #000;
+      }
+
+      .d3-tip {
+        line-height: 1;
+        font-weight: bold;
+        padding: 12px;
+        background: rgba(51, 51, 51, 0.9);
+        color: #CCC;
+        border-radius: 2px;
+      }
+
+      /* Creates a small triangle extender for the tooltip */
+      .d3-tip:after {
+        box-sizing: border-box;
+        display: inline;
+        font-size: 10px;
+        width: 100%;
+        line-height: 1;
+        color: rgba(0, 0, 0, 0.8);
+        content: "\25BC";
+        position: absolute;
+        text-align: center;
+      }
+
+      /* Style northward tooltips differently */
+      .d3-tip.n:after {
+        margin: -1px 0 0 0;
+        top: 100%;
+        left: 0;
+      }
+      #animation {
+        display: block;
+        margin: auto;
+        background: #333;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="site-wrapper">
+      <!-- <a href="#" class="toggle-nav btn" id="toggleBtn"><i class="fa fa-bars"></i></a> -->
+      <div id="site-canvas">
+        <h1 id="site-title">Dan Maljovec</h1>
+        <div id="site-menu">
+          <ul>
+            <li><img alt='maljovec' class='avatar' src="https://avatars3.githubusercontent.com/u/8671026?v=3&s=460"></li>
+            <li><a href="#"><i class="toggle-nav fa fa-chevron-right fa-fw" id="toggleMenu"></i></a></li>
+            <li><a href="index.html">Home <i class="fa fa-home fa-fw"></i></a></li>
+            <li><a href="cv.html">CV <i class="fa fa-file-text fa-fw"></i></a></li>
+            <li><a href="pubs.html">Papers <i class="fa fa-files-o fa-fw"></i></a></li>
+            <li><a href="academia.html">Academia <i class="fa fa-graduation-cap fa-fw"></i></a></li>
+<!--            <li><a href="projects.html">Projects <i class="fa fa-cogs fa-fw"></i></a></li> -->
+            <li><a href="experiment.html">Experimental <i class="fa fa-flask fa-fw"></i></a></li>
+          </ul>
+        </div>
+        <div id="site-body">
+        <h2 class="content">Test Complex</h2>
+        <script>
+          var canvas = d3.select("body").select("#site-body").append("svg")
+                          .attr("class", "canvas")
+                          .attr("id", "canvas")
+                          .attr("width", width)
+                          .attr("height", height)
+                          .style("display", "block")
+                          .style("margin", "auto")
+                          .style("border", "1px solid black");
+
+          canvas.append("path")
+            .attr("class", "grid")
+            .attr("d", d3.range(cellSize, width, cellSize)
+            .map(function(x) { return "M" + Math.round(x) + ",0V" + height; })
+            .join("")
+            + d3.range(cellSize, height, cellSize)
+                .map(function(y) { return "M0," + Math.round(y) + "H" + width; })
+                .join(""));
+          constructGradientFlow(canvas);
+        </script>
+        <h2 class="content" style="padding-top:20px;">Flow Visualization</h2>
+         <p class="content">Borrowed heavily from <a href="http://bl.ocks.org/newby-jay/767c5ffdbbe43b65902f">Jay Newby's block</a> which in turn is based off <a href="http://earth.nullschool.net">a cool climate visualization by Cameron Beccario</a>.</p>
+         <canvas id="animation" width="600" height="600"></canvas>
+         <script src="flow_anim.js"></script>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

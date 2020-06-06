@@ -1,0 +1,79 @@
+.column
+{
+	width: 98%;
+	text-align:left;
+	font-family:Serif;
+	font-size:14px;
+	margin: 20px auto 10px auto;
+	background-position: left top;
+	background-repeat: no-repeat;
+/*	padding-top: 56px; */
+	padding-bottom: 25px;
+	overflow:auto;
+}
+
+a
+{
+	color: #c33;
+}
+
+a:hover
+{
+	color: #600;
+}
+
+h1
+{
+	margin-left: 50px;
+	display: inline-block;
+}
+
+.title
+{
+	margin: 10px 10px auto 10px;
+}
+
+.content
+{
+	margin: 5px 20px 20px 60px;
+}
+
+.content a
+{
+	text-decoration: none;
+	font-weight:bold;
+}
+
+img
+{
+	border-style: none;
+}
+
+h5
+{
+	font-weight:normal;
+	font-style:italic;
+}
+
+dt
+{
+	font-weight:bold;
+}
+
+#publications dd
+{
+	margin-bottom:10px;
+}
+
+strong
+{
+	font-weight:bolder;
+	font-style:italic;
+	color: #933;
+}
+
+#footer
+{
+	font-size: xx-small;
+	font-style:italic;
+}
