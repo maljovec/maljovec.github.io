@@ -127,7 +127,7 @@
 
         var idx = 0;
         for ( var i = xmin; i < xmax; i+=step) {
-          Xi = new Vector([i, 1]);
+          Xi = new Vector([[i], [1]]);
           sampled[2*idx] = i;
           sampled[2*idx+1] = beta.dot(Xi);
           idx++;
